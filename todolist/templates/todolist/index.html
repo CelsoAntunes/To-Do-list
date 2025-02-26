@@ -1,0 +1,27 @@
+{% load static %}
+
+<link rel="stylesheet" href="{% static 'todolist/style.css' %}">
+
+<form method="post">
+    {% csrf_token %}
+    {% if task_list_today %}
+        <ul>
+        {% for task in task_list_today %}
+            <li>
+                <label>
+                    <input type="checkbox" class="task-checkbox" data-task-id="{{ task.id }}" {% if task.done %}checked{% endif %}>
+                    {{ task.task_text }}
+                </label>
+            </li>
+        {% endfor %}
+        </ul>
+    {% else %}
+        <p>No tasks for today.</p>
+    {% endif %}
+</form>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+    var updateTaskURL = "{% url 'todolist:update_task' %}"; 
+</script>
+<script src="{% static 'todolist/js/task_update.js' %}"></script>
