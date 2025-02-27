@@ -4,10 +4,11 @@ from django.shortcuts import render, redirect
 from django.utils.decorators import method_decorator
 from django.views import generic
 from django.utils import timezone
-from .models import Task
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.views import LoginView
+from django.contrib.auth import login
+from .models import Task
 
 class CustomLoginView(LoginView):
     template_name = 'todolist/login.html'
