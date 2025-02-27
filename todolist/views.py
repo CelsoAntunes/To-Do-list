@@ -1,18 +1,39 @@
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
+from django.shortcuts import render, redirect
 from django.utils.decorators import method_decorator
 from django.views import generic
 from django.utils import timezone
 from .models import Task
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth.views import LoginView
 
-class IndexView(generic.ListView):
+class CustomLoginView(LoginView):
+    template_name = 'todolist/login.html'
+
+def register(request):
+    if request.method == "POST":
+        form = UserCreationForm(request.POST)
+        if form.is_valid():
+            user = form.save()
+            login(request, user)  # Auto-login after registration
+            return redirect("todolist:index")  # Redirect to main page
+    else:
+        form = UserCreationForm()
+    return render(request, "registration/register.html", {"form": form})
+
+class IndexView(LoginRequiredMixin, generic.ListView):
     template_name = "todolist/index.html"
+    login_url = "todolist:login"
+    redirect_field_name = "next"
     context_object_name = 'task_list_today'
 
     def get_queryset(self):
         """Return the Tasks of today."""
         today = timezone.now().date()
         return Task.objects.filter(pub_date__date=today).order_by("pub_date")
+
 @csrf_exempt  # You may need a better CSRF solution in production
 def update_task(request):
     """Handle AJAX request to update task status."""

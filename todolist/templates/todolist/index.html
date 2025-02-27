@@ -20,6 +20,11 @@
     {% endif %}
 </form>
 
+<form action="{% url 'todolist:logout' %}" method="post">
+    {% csrf_token %}
+    <button type="submit">Logout</button>
+</form>
+
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
     var updateTaskURL = "{% url 'todolist:update_task' %}"; 
