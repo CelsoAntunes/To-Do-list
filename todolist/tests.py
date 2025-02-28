@@ -217,6 +217,120 @@ class ModelsCreationTests(TestCase):
         with self.assertRaises(ValidationError):
             invalid_task.full_clean()
 
+    def create_new_task_today(self):
+        """
+        Check if the new created task is correctly saved to the db.
+        """
+        self.client.login(username=self.__class__.user.username, password='testpass')
+        time = timezone.now()
+        task_text = "New task"
+        user_id = self.client.session['_auth_user_id']
+        user = User.objects.get(id=user_id)
+        response = self.client.post(reverse('todolist:index'), {
+            'task_text': task_text,
+            'pub_date': time
+        })
+        self.assertEqual(response.status_code, 302)
+
+        form = response.context.get('form')
+
+        task_db = Task.objects.filter(pub_date__gte=time).first()
+
+        self.assertIsNotNone(task_db)
+        self.assertEqual(task_db.task_text, task_text)
+        self.assertTrue(task_db.pub_date >= time)
+        self.assertEqual(task_db.user, self.__class__.user)
+
+    def test_create_task_not_logged_in(self):
+        """
+        Check if an unauthenticated user cannot create a task.
+        """
+        task_text = "New task"
+        time = timezone.now()
+
+        response = self.client.post(reverse('todolist:index'), {
+            'task_text': task_text,
+            'pub_date': time,
+        })
+        self.assertEqual(response.status_code, 200)
+
+        form = response.context.get('form')
+
+        self.assertTrue(form.errors)
+        self.assertRedirects(form, f'{reverse("login")}?next={reverse("todolist:index")}')
+
+    def test_create_task_empty_text(self):
+        """
+        Check if a task with empty task_text cannot be created.
+        """
+        self.client.login(username=self.__class__.user.username, password='testpass')
+        
+        response = self.client.post(reverse('todolist:index'), {
+            'task_text': '', 
+            'pub_date': timezone.now(),
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response,'Task text cannot be empty!')
+
+    def test_create_task_missing_required_fields(self):
+        """
+        Check if missing required fields (e.g., task_text) results in a validation error.
+        """
+        self.client.login(username=self.__class__.user.username, password='testpass')
+
+        response = self.client.post(reverse('todolist:index'), {
+            'pub_date': timezone.now(), 
+        })
+
+        self.assertFormError(response, 'form', 'task_text', 'This field is required.')
+
+    def test_create_task_too_long_task_text(self):
+        """
+        Check if task creation fails when task_text exceeds the character limit.
+        """
+        self.client.login(username=self.__class__.user.username, password='testpass')
+
+        
+        long_task_text = 'A' * 1000 
+        response = self.client.post(reverse('todolist:index'), {
+            'task_text': long_task_text,
+            'pub_date': timezone.now(),
+        })
+
+        self.assertFormError(response, 'form', 'task_text', 'Ensure this value has at most 255 characters.')
+
+    def test_create_task_with_incorrect_user(self):
+        """
+        Check if an incorrect user ID is rejected during task creation.
+        """
+        self.client.login(username=self.__class__.user.username, password='testpass')
+
+        invalid_user_id = 99999 
+        response = self.client.post(reverse('todolist:index'), {
+            'task_text': 'Task with invalid user',
+            'pub_date': timezone.now(),
+            'user': invalid_user_id
+        })
+
+        self.assertFormError(response, 'form', 'user', 'Select a valid choice. That choice is not one of the available choices.')
+    
+    def test_create_task_for_another_user(self):
+        """
+        Check if an incorrect user ID is rejected during task creation.
+        """
+        self.client.login(username=self.__class__.user.username, password='testpass')
+        user = User.objects.create_user(username='testuser1', password='testpass')
+        
+        response = self.client.post(reverse('todolist:index'), {
+            'task_text': 'Task with invalid user',
+            'pub_date': timezone.now(),
+            'user': user.id
+        })
+
+        self.assertFormError(response, 'form', 'user', 'You cannot create tasks for other users.')
+        self.assertEqual(Task.objects.filter(user=user).count(), 0)
+
 class UserRegistrationTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):

@@ -2,6 +2,20 @@
 
 <link rel="stylesheet" href="{% static 'todolist/style.css' %}">
 
+{% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+            <div class="alert alert-danger">{{ message }}</div>
+        {% endfor %}
+    </div>
+{% endif %}
+
+<form method="POST" action="{% url 'todolist:index' %}">
+    {% csrf_token %}
+    <input type="text" name="task_text" placeholder="Enter your task">
+    <button type="submit">+</button>
+</form>
+
 <form method="post">
     {% csrf_token %}
     {% if task_list_today %}

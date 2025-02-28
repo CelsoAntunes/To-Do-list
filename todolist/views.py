@@ -8,6 +8,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.views import LoginView
 from django.contrib.auth import login
+from django.contrib import messages
 from .models import Task
 
 class CustomLoginView(LoginView):
@@ -34,6 +35,19 @@ class IndexView(LoginRequiredMixin, generic.ListView):
         """Return the Tasks of the specified user today."""
         today = timezone.now().date()
         return Task.objects.filter(user=self.request.user, pub_date__date=today).order_by("pub_date")
+
+    def post(self, request, *args, **kwargs):
+        """Handle the creation of the task."""
+        task_text = request.POST.get('task_text', '').strip()
+        if not task_text:
+            messages.error(request, 'Task text cannot be empty!')
+            return render(request, self.template_name, {'task_list_today': self.get_queryset()})
+        Task.objects.create(
+            user=request.user,
+            task_text=task_text,
+            pub_date=timezone.now() 
+        )
+        return redirect('todolist:index')
 
 @csrf_exempt  # You may need a better CSRF solution in production
 def update_task(request):
