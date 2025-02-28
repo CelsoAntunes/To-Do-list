@@ -31,9 +31,9 @@ class IndexView(LoginRequiredMixin, generic.ListView):
     context_object_name = 'task_list_today'
 
     def get_queryset(self):
-        """Return the Tasks of today."""
+        """Return the Tasks of the specified user today."""
         today = timezone.now().date()
-        return Task.objects.filter(pub_date__date=today).order_by("pub_date")
+        return Task.objects.filter(user=self.request.user, pub_date__date=today).order_by("pub_date")
 
 @csrf_exempt  # You may need a better CSRF solution in production
 def update_task(request):
