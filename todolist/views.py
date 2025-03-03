@@ -50,9 +50,6 @@ class IndexView(LoginRequiredMixin, generic.ListView):
         if len(task_text) > 255:
             messages.error(request, 'Task is too long!')
             return render(request, self.template_name, {'task_list_today': self.get_queryset()})
-        if str(request.user.id) != str(request.POST.get('user_id', '')):
-            messages.error(request, 'You cannot create tasks for other users!')
-            return render(request, self.template_name, {'task_list_today': self.get_queryset()})
         Task.objects.create(
             user=request.user,
             task_text=task_text,
