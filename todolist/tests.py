@@ -8,6 +8,7 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.contrib.auth.models import User
 from django.contrib.auth import get_user_model
+from django.contrib import messages
 
 from .models import Task
 
@@ -191,6 +192,22 @@ class ModelsCreationTests(TestCase):
         cls.username="testuser"
         cls.password="testpass"
         cls.user = get_user_model().objects.create_user(username=cls.username, password=cls.password)
+    
+    def test_create_normal_task(self):
+        """
+        Normal conditions for a task.
+        """
+        task = Task(task_text="Valid task", pub_date=timezone.now(), user=self.__class__.user)
+        task.save()
+        self.client.login(
+            username=self.__class__.username,
+            password=self.__class__.password
+        )
+        response = self.client.get(reverse("todolist:index"))
+        self.assertQuerySetEqual(
+            response.context["task_list_today"],
+            [task],
+        )
 
     def test_task_with_invalid_pub_date(self):
         """
@@ -217,28 +234,23 @@ class ModelsCreationTests(TestCase):
         with self.assertRaises(ValidationError):
             invalid_task.full_clean()
 
-    def create_new_task_today(self):
+    def test_create_new_task_today(self):
         """
         Check if the new created task is correctly saved to the db.
         """
-        self.client.login(username=self.__class__.user.username, password='testpass')
-        time = timezone.now()
+        login_successful = self.client.login(username=self.__class__.user.username, password='testpass')
+        session_user_id = self.client.session.get('_auth_user_id')
         task_text = "New task"
-        user_id = self.client.session['_auth_user_id']
-        user = User.objects.get(id=user_id)
-        response = self.client.post(reverse('todolist:index'), {
-            'task_text': task_text,
-            'pub_date': time
-        })
-        self.assertEqual(response.status_code, 302)
-
-        form = response.context.get('form')
-
-        task_db = Task.objects.filter(pub_date__gte=time).first()
-
-        self.assertIsNotNone(task_db)
-        self.assertEqual(task_db.task_text, task_text)
-        self.assertTrue(task_db.pub_date >= time)
+        response = self.client.post(
+            reverse('todolist:index'), 
+            {
+                'task_text': task_text,
+                'user_id': session_user_id
+            }
+        )
+        task_db = Task.objects.filter(task_text=task_text).first()
+        self.assertIsNotNone(task_db, "Does not fetch task from db")
+        self.assertEqual(task_db.task_text,task_text)
         self.assertEqual(task_db.user, self.__class__.user)
 
     def test_create_task_not_logged_in(self):
@@ -252,53 +264,74 @@ class ModelsCreationTests(TestCase):
             'task_text': task_text,
             'pub_date': time,
         })
-        self.assertEqual(response.status_code, 200)
-
-        form = response.context.get('form')
-
-        self.assertTrue(form.errors)
-        self.assertRedirects(form, f'{reverse("login")}?next={reverse("todolist:index")}')
+        self.assertEqual(response.status_code, 302)
+        self.assertRedirects(response, f'{reverse("todolist:login")}?next={reverse("todolist:index")}')
 
     def test_create_task_empty_text(self):
         """
         Check if a task with empty task_text cannot be created.
         """
-        self.client.login(username=self.__class__.user.username, password='testpass')
-        
+        login_successful = self.client.login(username=self.__class__.user.username, password='testpass')
+        session_user_id = self.client.session.get('_auth_user_id')
         response = self.client.post(reverse('todolist:index'), {
             'task_text': '', 
             'pub_date': timezone.now(),
-        })
+            'user_id': session_user_id
+        }, follow=True)
+
+        messages_list = [msg.message for msg in messages.get_messages(response.wsgi_request)]
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response,'Task text cannot be empty!')
+        self.assertTrue(messages_list)
+        self.assertIn('Task must contain at least one letter or number!', messages_list)
 
     def test_create_task_missing_required_fields(self):
         """
         Check if missing required fields (e.g., task_text) results in a validation error.
         """
         self.client.login(username=self.__class__.user.username, password='testpass')
-
+        session_user_id = self.client.session.get('_auth_user_id')
         response = self.client.post(reverse('todolist:index'), {
             'pub_date': timezone.now(), 
+            'user_id': session_user_id
         })
+        messages_list = [msg.message for msg in messages.get_messages(response.wsgi_request)]
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(messages_list)
+        self.assertIn('Task must contain at least one letter or number!', messages_list)
 
-        self.assertFormError(response, 'form', 'task_text', 'This field is required.')
+    def test_create_task_missing_pub_date(self):
+        """
+        Check if missing pub_date tasks can be uploaded.
+        """
+        self.client.login(username=self.__class__.user.username, password='testpass')
+        session_user_id = self.client.session.get('_auth_user_id')
+        task_text='hello world'
+        response = self.client.post(reverse('todolist:index'), {
+            'task_text': task_text,
+            'user_id': session_user_id
+        })
+        messages_list = [msg.message for msg in messages.get_messages(response.wsgi_request)]
+        self.assertEqual(response.status_code, 302)
+        task = Task.objects.get(task_text=task_text)
+        self.assertEqual(task.pub_date.date(), timezone.now().date())
 
     def test_create_task_too_long_task_text(self):
         """
         Check if task creation fails when task_text exceeds the character limit.
         """
         self.client.login(username=self.__class__.user.username, password='testpass')
-
-        
+        session_user_id = self.client.session.get('_auth_user_id')
         long_task_text = 'A' * 1000 
         response = self.client.post(reverse('todolist:index'), {
             'task_text': long_task_text,
             'pub_date': timezone.now(),
+            'user_id': session_user_id
         })
-
-        self.assertFormError(response, 'form', 'task_text', 'Ensure this value has at most 255 characters.')
+        messages_list = [msg.message for msg in messages.get_messages(response.wsgi_request)]
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(messages_list)
+        self.assertIn('Task is too long!', messages_list)
 
     def test_create_task_with_incorrect_user(self):
         """
@@ -312,8 +345,10 @@ class ModelsCreationTests(TestCase):
             'pub_date': timezone.now(),
             'user': invalid_user_id
         })
-
-        self.assertFormError(response, 'form', 'user', 'Select a valid choice. That choice is not one of the available choices.')
+        messages_list = [msg.message for msg in messages.get_messages(response.wsgi_request)]
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(messages_list)
+        self.assertIn('You cannot create tasks for other users!', messages_list)
     
     def test_create_task_for_another_user(self):
         """
@@ -327,9 +362,47 @@ class ModelsCreationTests(TestCase):
             'pub_date': timezone.now(),
             'user': user.id
         })
+        messages_list = [msg.message for msg in messages.get_messages(response.wsgi_request)]
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(messages_list)
+        self.assertIn('You cannot create tasks for other users!', messages_list)
 
-        self.assertFormError(response, 'form', 'user', 'You cannot create tasks for other users.')
-        self.assertEqual(Task.objects.filter(user=user).count(), 0)
+    def test_create_task_without_being_logged_in(self):
+        """
+        Check if a user can post a task without being logged in.
+        """
+        self.client.logout()
+        user_id = 1
+        initial_task_count = Task.objects.count()
+        response = self.client.post(
+            reverse('todolist:index'), 
+            {
+                'task_text': 'Task without being logged in',
+                'pub_date': timezone.now(),
+                'user_id': user_id
+            }
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertRedirects(response, reverse("todolist:login")+'?next=/')
+        self.assertEqual(Task.objects.count(), initial_task_count)
+
+    def test_unicode_task_text(self):
+        self.client.login(username=self.__class__.user.username, password='testpass')
+        session_user_id = self.client.session.get('_auth_user_id')
+        self.assertTrue(self.client.session.get('_auth_user_id'))
+        task_text = '🔥🚀 a你好'
+        response = self.client.post(
+            reverse('todolist:index'), 
+            {
+                'task_text': task_text,
+                'pub_date':timezone.now(), 
+                'user_id': session_user_id
+            }
+        )
+        self.assertEqual(response.status_code, 302)  
+        self.assertEqual(Task.objects.filter(task_text=task_text).count(), 1)
+        task_db = Task.objects.get(task_text=task_text)
+        self.assertEqual(task_text,task_db.task_text)
 
 class UserRegistrationTestCase(TestCase):
     @classmethod

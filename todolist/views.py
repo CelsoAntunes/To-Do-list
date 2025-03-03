@@ -10,6 +10,7 @@ from django.contrib.auth.views import LoginView
 from django.contrib.auth import login
 from django.contrib import messages
 from .models import Task
+import re
 
 class CustomLoginView(LoginView):
     template_name = 'todolist/login.html'
@@ -38,9 +39,19 @@ class IndexView(LoginRequiredMixin, generic.ListView):
 
     def post(self, request, *args, **kwargs):
         """Handle the creation of the task."""
+        if not request.user.is_authenticated:
+            messages.error(request, 'You must be logged in to create a task.')
+            return redirect("todolist:login")
+
         task_text = request.POST.get('task_text', '').strip()
-        if not task_text:
-            messages.error(request, 'Task text cannot be empty!')
+        if not task_text or not re.search(r"[a-zA-Z0-9]", task_text): 
+            messages.error(request, 'Task must contain at least one letter or number!')
+            return render(request, self.template_name, {'task_list_today': self.get_queryset()})
+        if len(task_text) > 255:
+            messages.error(request, 'Task is too long!')
+            return render(request, self.template_name, {'task_list_today': self.get_queryset()})
+        if str(request.user.id) != str(request.POST.get('user_id', '')):
+            messages.error(request, 'You cannot create tasks for other users!')
             return render(request, self.template_name, {'task_list_today': self.get_queryset()})
         Task.objects.create(
             user=request.user,
