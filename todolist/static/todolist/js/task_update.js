@@ -12,7 +12,6 @@ function getCSRFToken() {
 }
 
 $(document).ready(function() {
-
     $(".task-checkbox").on('change', function() {
         var taskId = $(this).data('task-id');
         var isChecked = $(this).prop('checked');
@@ -39,5 +38,50 @@ $(document).ready(function() {
                 console.error('Error updating task', xhr.responseText);
             }
         });
+    });
+    $(".editable-task").on("keydown", function(e) {
+        if (e.key === "Enter") {
+            e.preventDefault();
+        }
+    });
+    $(".editable-task").on('blur', function() {
+        var taskId = $(this).data('task-id');
+        var taskText = $(this).data('task_text');
+        var newTaskText = $(`.editable-task[data-task-id="${taskId}"]`).text().trim();
+
+        if (newTaskText.length === 0) {
+            alert("Task cannot be empty!");
+            return;
+        }
+        if (newTaskText.length > 255) {
+            alert("Task is too long!");
+            return;
+        }
+        if (!/[a-zA-Z0-9]/.test(newTaskText)) { 
+            alert("Task must contain at least one letter or number.");
+            return;
+        }
+
+        if (newTaskText !== null && newTaskText !== taskText) {
+            $.ajax({
+                url: updateTaskURL,
+                method: "POST",
+                headers: { "X-CSRFToken": getCSRFToken() },
+                data: {
+                    task_id: taskId,
+                    task_text: newTaskText
+                },
+                success: function(response) {
+                    if (response.redirect) {
+                        window.location.href = response.redirect;
+                    } else {
+                        console.log("Task updated successfully", response);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error updating task', xhr.responseText);
+                }
+            });
+        }
     });
 });

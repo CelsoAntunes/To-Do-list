@@ -283,7 +283,7 @@ class ModelsCreationTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertTrue(messages_list)
-        self.assertIn('Task must contain at least one letter or number!', messages_list)
+        self.assertIn('Task must contain at least one letter or number.', messages_list)
 
     def test_create_task_missing_required_fields(self):
         """
@@ -298,7 +298,7 @@ class ModelsCreationTests(TestCase):
         messages_list = [msg.message for msg in messages.get_messages(response.wsgi_request)]
         self.assertEqual(response.status_code, 200)
         self.assertTrue(messages_list)
-        self.assertIn('Task must contain at least one letter or number!', messages_list)
+        self.assertIn('Task must contain at least one letter or number.', messages_list)
 
     def test_create_task_missing_pub_date(self):
         """
@@ -510,3 +510,30 @@ class UserRegistrationTestCase(TestCase):
         self.client.logout()
         response = self.client.get(reverse("todolist:index"))
         self.assertRedirects(response,reverse("todolist:login")+"?next=/")
+
+class UpdateTaskTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        """
+        Set up data that will be shared across all tests in this class.
+        """
+        cls.user = get_user_model().objects.create_user(username='testuser', password='testpass')
+
+    def test_update_task(self):
+        self.client.login(username=self.__class__.user.username, password='testpass')
+        task_text = "First task"
+        response = self.client.post(
+            reverse('todolist:index'), 
+            {
+                'task_text': task_text,
+            }
+        )
+        task_db = Task.objects.get(task_text=task_text)
+        self.assertEqual(task_db.task_text, task_text)
+        new_task_text = "New task text"
+        self.client.post(reverse('todolist:update')), {
+            'task_text': new_task_text
+        }
+        updated_task = Task.objects.get(task_text=new_task_text)
+        self.assertEqual(updated_task.task_text, new_task_test)
+        

@@ -22,9 +22,9 @@
         <ul>
         {% for task in task_list_today %}
             <li>
+                <input type="checkbox" class="task-checkbox" data-task-id="{{ task.id }}" {% if task.done %}checked{% endif %}>
                 <label>
-                    <input type="checkbox" class="task-checkbox" data-task-id="{{ task.id }}" {% if task.done %}checked{% endif %}>
-                    {{ task.task_text }}
+                    <span class="editable-task" contenteditable="true" data-task-id="{{ task.id }}">{{ task.task_text }}</span>
                 </label>
             </li>
         {% endfor %}
@@ -43,4 +43,4 @@
 <script>
     var updateTaskURL = "{% url 'todolist:update_task' %}"; 
 </script>
-<script src="{% static 'todolist/js/task_update.js' %}"></script>
+<script src="{% static 'todolist/js/task_update.js' %}?v=3"></script><!-- add ?v=2 to the end in case there is need to bust cache -->
