@@ -80,5 +80,9 @@ def update_task(request):
         task.task_text = task_text
         task.save()
         return JsonResponse({'status': 'success'})
-    else:
-        return JsonResponse({'status': 'error', 'message': 'Invalid task text!'})
+    elif not task_text:
+        return JsonResponse({'status': 'error', 'message': "Task cannot be empty!"})
+    elif len(task_text) >255:
+        return JsonResponse({'status': 'error', 'message': "Task too long!"})
+    elif not re.search(r"[a-zA-Z0-9]", task_text):
+        return JsonResponse({'status': 'error', 'message': "Task must contain at least one letter or number."})
