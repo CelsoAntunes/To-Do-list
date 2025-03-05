@@ -21,11 +21,12 @@
     {% if task_list_today %}
         <ul>
         {% for task in task_list_today %}
-            <li>
+            <li id="task-{{ task.id }}">
                 <input type="checkbox" class="task-checkbox" data-task-id="{{ task.id }}" {% if task.done %}checked{% endif %}>
                 <label>
                     <span class="editable-task" contenteditable="true" data-task-id="{{ task.id }}">{{ task.task_text }}</span>
                 </label>
+                <button type="button" class="delete-task" data-task-id="{{ task.id }}">Delete</button>
             </li>
         {% endfor %}
         </ul>
@@ -43,4 +44,4 @@
 <script>
     var updateTaskURL = "{% url 'todolist:update_task' %}"; 
 </script>
-<script src="{% static 'todolist/js/task_update.js' %}?v=3"></script><!-- add ?v=2 to the end in case there is need to bust cache -->
+<script src="{% static 'todolist/js/task_update.js' %}?v=5"></script><!-- add ?v=2 to the end in case there is need to bust cache -->

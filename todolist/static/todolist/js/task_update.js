@@ -44,7 +44,38 @@ $(document).ready(function() {
             e.preventDefault();
         }
     });
+    $(".delete-task").on('click', function(e) {
+        e.stopPropagation();
+        
+        var taskId = $(this).data('task-id');
+
+        if (confirm("Are you sure you want to delete this task?")) {
+            $.ajax({
+                url: updateTaskURL, 
+                method: "POST",
+                headers: { "X-CSRFToken": getCSRFToken() },
+                data: {
+                    task_id: taskId,
+                    delete: true
+                },
+                success: function(response) {
+                    if (response.status === 'success') {
+                        console.log("Task deleted successfully", response);
+                        $(`#task-${taskId}`).remove();
+                    } else {
+                        alert(response.message);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error deleting task', xhr.responseText);
+                }
+            });
+        }
+    });
     $(".editable-task").on('blur', function() {
+        if ($(this).hasClass('deleting')) { 
+            return;
+        }
         var taskId = $(this).data('task-id');
         var taskText = $(this).data('task_text');
         var newTaskText = $(`.editable-task[data-task-id="${taskId}"]`).text().trim();

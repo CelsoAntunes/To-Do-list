@@ -1,6 +1,6 @@
 from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-from django.shortcuts import render, redirect
+from django.views.decorators.csrf import csrf_protect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.utils.decorators import method_decorator
 from django.views import generic
 from django.utils import timezone
@@ -57,32 +57,43 @@ class IndexView(LoginRequiredMixin, generic.ListView):
         )
         return redirect('todolist:index')
 
-@csrf_exempt  # You may need a better CSRF solution in production
+@csrf_protect 
 def update_task(request):
     """Handle AJAX request to update task status and text."""
     if not request.user.is_authenticated:
-            messages.error(request, 'You must be logged in to update a task.')
-            return redirect("todolist:login")
+        messages.error(request, 'You must be logged in to update a task.')
+        return redirect("todolist:login")
     if request.method == "POST":
         task_id = request.POST.get('task_id', '')
         try:
             task = Task.objects.get(id=task_id)
         except Task.DoesNotExist:
-            messages.error(request, 'Select a valid task.')
-            return redirect('todolist:index')
-    if 'done' in request.POST:
-        task.done = request.POST['done'] == 'true'
-        task.save()
-        return JsonResponse({'status': 'success'})
+            return JsonResponse({'status': 'error', 'message': 'Select a valid task.'}, status=404)
 
-    task_text = request.POST.get('task_text', '').strip()
-    if task_text and len(task_text) <= 255 and re.search(r"[a-zA-Z0-9]", task_text):
-        task.task_text = task_text
-        task.save()
-        return JsonResponse({'status': 'success'})
-    elif not task_text:
+        if task.user != request.user:
+            return JsonResponse({'error': 'Unauthorized'}, status=403)
+            
+        if request.POST.get('delete') == 'true':
+            task.delete()
+            return JsonResponse({'status': 'success', 'message': 'Task deleted successfully.'})
+
+        if 'done' in request.POST:
+            task.done = request.POST['done'] == 'true'
+            task.save()
+            return JsonResponse({'status': 'success'})
+
+        task_text = request.POST.get('task_text', '').strip()
+        if task_text:
+            if len(task_text) > 255:
+                return JsonResponse({'status': 'error', 'message': "Task too long!"})
+            
+            if not re.search(r"[a-zA-Z0-9]", task_text):
+                return JsonResponse({'status': 'error', 'message': "Task must contain at least one letter or number."})
+            
+            task.task_text = task_text
+            task.save()
+            return JsonResponse({'status': 'success'})
+
         return JsonResponse({'status': 'error', 'message': "Task cannot be empty!"})
-    elif len(task_text) >255:
-        return JsonResponse({'status': 'error', 'message': "Task too long!"})
-    elif not re.search(r"[a-zA-Z0-9]", task_text):
-        return JsonResponse({'status': 'error', 'message': "Task must contain at least one letter or number."})
+    
+    return JsonResponse({'status': 'error', 'message': 'Invalid request method.'}, status=400)

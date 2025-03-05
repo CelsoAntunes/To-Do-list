@@ -15,6 +15,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.alert import Alert
 
 from .models import Task
 
@@ -576,6 +577,85 @@ class TaskUpdateTests(TestCase):
         self.task.refresh_from_db()
         self.assertEqual(self.task.task_text, 'Test task')
 
+    def test_unauthorized_user_cannot_update(self):
+        self.client.login(username='testuser', password='testpass')
+        user2 = User.objects.create_user(username='testuser1', password='testpass')
+        task2 = Task.objects.create(task_text='New test task', pub_date=timezone.now(), user=user2)
+        response = self.client.post(
+            reverse('todolist:update_task'), {  
+                'task_id': task2.id,
+                'task_text': 'Updated test task'
+            },
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest'
+        )
+        self.assertEqual(response.status_code, 403)     
+        self.assertEqual(Task.objects.filter(id=task2.id).first().task_text, 'New test task')
+
+class TaskDeleteTestCase(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.user = User.objects.create_user(username='testuser', password='testpass')
+        cls.task = Task.objects.create(task_text="Test task", pub_date=timezone.now(), user=cls.user)
+
+    def setUp(self):    
+        self.client.login(username='testuser', password='testpass')
+
+    def test_delete_task(self):
+        response = self.client.post(
+            reverse('todolist:update_task'),
+            {'task_id': self.task.id, 'delete': 'true'},
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest'
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertJSONEqual(response.content, {"status": "success", "message": "Task deleted successfully."})
+        self.assertFalse(Task.objects.filter(id=self.task.id).exists())
+    
+    def test_unauthorized_user_cannot_delete(self):
+        user2 = User.objects.create_user(username='testuser1', password='testpass')
+        task2 = Task.objects.create(task_text='New test task', pub_date=timezone.now(), user=user2)
+        response = self.client.post(
+            reverse('todolist:update_task'),
+            {'task_id': task2.id, 'delete': 'true'},
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest'
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(Task.objects.filter(id=task2.id).exists())
+    
+    def test_delete_unexistent_task(self):
+        response = self.client.post(
+            reverse('todolist:update_task'),
+            {'task_id': 999, 'delete': 'true'},
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest'
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_delete_post_twice(self):
+        response = self.client.post(
+            reverse('todolist:update_task'),
+            {'task_id': self.task.id, 'delete': 'true'},
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest'
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Task.objects.filter(id=self.task.id).exists())
+        response = self.client.post(
+            reverse('todolist:update_task'),
+            {'task_id': self.task.id, 'delete': 'true'},
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest'
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_delete_unauthenticated_user(self):
+        self.client.logout()
+        response = self.client.post(
+            reverse('todolist:update_task'),
+            {'task_id': self.task.id, 'delete': 'true'},
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest'
+        )
+        self.assertEqual(response.status_code,302)
+        self.assertTrue(Task.objects.filter(id=self.task.id).exists())
+
+
 class TaskSeleniumTests(StaticLiveServerTestCase):
     @classmethod
     def setUpClass(cls):
@@ -632,7 +712,7 @@ class TaskSeleniumTests(StaticLiveServerTestCase):
         self.login()
         self.browser.find_element(By.CSS_SELECTOR, 'form[action$="logout/"] button[type="submit"]').click()
         WebDriverWait(self.browser, 5).until(
-            EC.presence_of_element_located((By.NAME, 'username'))  # Login form should be visible again
+            EC.presence_of_element_located((By.NAME, 'username')) 
         )
         self.assertIn('Login', self.browser.page_source)
     
@@ -656,18 +736,34 @@ class TaskSeleniumTests(StaticLiveServerTestCase):
         updated_task_element = self.browser.find_element(By.CSS_SELECTOR, '.editable-task')
         self.assertEqual(updated_task_element.text, 'Updated task text')
     
-    """def test_delete_task(self):
+    def test_delete_task(self):
         self.login()
-        self.test_create_new_task()
-        delete_button = self.browser.find_element(By.CSS_SELECTOR, '.delete-btn')
+        self.create_task()
+        delete_button = self.browser.find_element(By.CSS_SELECTOR, '.delete-task')
         delete_button.click()
-        time.sleep(1)
-        self.assertNotIn('New Task', self.browser.page_source)"""
+        WebDriverWait(self.browser, 5).until(EC.alert_is_present())
+        Alert(self.browser).accept()
+        WebDriverWait(self.browser, 1).until_not(
+            EC.text_to_be_present_in_element((By.CSS_SELECTOR, '.editable-task'), 'New Task')
+        )
+        self.assertNotIn('New Task', self.browser.page_source)
+    
+    def test_delete_task_cancel(self):
+        self.login()
+        self.create_task()
+        delete_button = self.browser.find_element(By.CSS_SELECTOR, '.delete-task')
+        delete_button.click()
+        WebDriverWait(self.browser, 5).until(EC.alert_is_present())
+        Alert(self.browser).dismiss()
+        WebDriverWait(self.browser, 1).until(
+            EC.text_to_be_present_in_element((By.CSS_SELECTOR, '.editable-task'), 'New Task')
+        )
+        self.assertIn('New Task', self.browser.page_source)
     
     def test_complete_task(self):
         self.login()
         self.create_task()
-        checkbox = WebDriverWait(self.browser, 10).until(
+        checkbox = WebDriverWait(self.browser, 5).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, '.task-checkbox'))
         )
         checkbox.click()
@@ -719,4 +815,4 @@ class TaskSeleniumTests(StaticLiveServerTestCase):
         self.login()
         self.browser.get(self.index_url)
         self.browser.refresh()
-        self.assertEqual(self.browser.current_url, self.index_url) 
+        self.assertEqual(self.browser.current_url, self.index_url)
