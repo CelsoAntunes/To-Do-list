@@ -1,0 +1,41 @@
+services:
+  db:
+    image: postgres:14
+    container_name: user_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER:-user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
+      POSTGRES_DB: ${DB_NAME:-userdb}
+    volumes:
+      - user_db_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - app_network
+
+  django:
+    build: .
+    container_name: user_django
+    restart: always
+    depends_on:
+      - db
+    environment:
+      DB_NAME: ${DB_NAME:-userdb}
+      DB_USER: ${DB_USER:-user}
+      DB_PASSWORD: ${DB_PASSWORD:-password}
+      DB_HOST: db
+      DB_PORT: 5432
+    ports:
+      - "8000:8000"
+    networks:
+      - app_network
+    volumes:
+      - .:/app
+
+volumes:
+  user_db_data:
+
+networks:
+  app_network:
+    driver: bridge
