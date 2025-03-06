@@ -41,7 +41,7 @@ This command will:
 - Download the official PostgreSQL 14 image (if not available locally).
 - Start both the Django app and the PostgreSQL database in the background.
 
-###Optional: If you want to build the image yourself, before you "run docker-compose up -d", run:
+### Optional: If you want to build the image yourself, before you "run docker-compose up -d", run:
 ```bash
 docker-compose up --build
 ```
