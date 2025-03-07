@@ -87,6 +87,14 @@ In case you want to run the already structured automated tests, run:
 python manage.py test
 ```
 
+If you want to test an specific aspect of the application, run:
+
+```bash
+python manage.py test todolist.tests.test_{something}
+```
+
+where something in [models, selenium, task_delete, task_update, user_registration, views].
+
 ## Docker Compose Example Configuration
 
 If you want to change the ports or any other configuration, here's an example of how the `docker-compose.yml` file looks:
