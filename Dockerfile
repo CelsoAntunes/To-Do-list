@@ -19,7 +19,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of your application
+# Copy mytodo source code
 COPY . .
 
 # Set environment variables to avoid __pycache__ and use unbuffered logs

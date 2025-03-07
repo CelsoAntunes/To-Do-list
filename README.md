@@ -1,5 +1,5 @@
 
-# First Project
+# My To-Do-list
 
 This is a Django application running in Docker with a PostgreSQL database. The project is containerized using Docker and Docker Compose, and it can be easily set up and run with minimal configuration.
 
