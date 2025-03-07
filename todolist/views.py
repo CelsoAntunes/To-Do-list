@@ -20,8 +20,8 @@ def register(request):
         form = UserCreationForm(request.POST)
         if form.is_valid():
             user = form.save()
-            login(request, user)  # Auto-login after registration
-            return redirect("todolist:index")  # Redirect to main page
+            login(request, user)  
+            return redirect("todolist:index") 
     else:
         form = UserCreationForm()
     return render(request, "registration/register.html", {"form": form})
