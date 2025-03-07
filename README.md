@@ -66,24 +66,6 @@ This will stop and remove the containers, but the data will persist because the 
 
 - The PostgreSQL image will be pulled automatically as it is the official `postgres:14` image.
 
-### 5. Running the Prebuilt Docker Images
-
-Once the images are pulled, you can start the project by running:
-
-```bash
-docker-compose up -d
-```
-
-### 6. Database Initialization
-
-The first time you run the containers, the Django application will need to apply migrations to set up the database schema. This will be done automatically on the first run.
-
-However, if you need to manually run the migrations, you can do so by executing:
-
-```bash
-docker-compose exec django python manage.py migrate
-```
-
 ## Troubleshooting
 
 - **Ports already in use**: If you get an error about port 8000 or 5432 already being in use, make sure there are no other services running on those ports, or change the ports in the `docker-compose.yml` file.
