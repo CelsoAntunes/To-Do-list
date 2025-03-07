@@ -99,6 +99,11 @@ docker-compose exec django python manage.py migrate
 ## Contributing
 
 Feel free to fork the repository, create a new branch, make your changes, and submit a pull request.
+In case you want to run the already structured automated tests, run:
+
+```bash
+python manage.py test
+```
 
 ## Docker Compose Example Configuration
 
